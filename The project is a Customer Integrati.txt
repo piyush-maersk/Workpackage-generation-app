@@ -1,0 +1,45 @@
+The project is a Customer Integration for warehouse operation with total area of x sq ft. The Tier 3 facility will have minimal infrastructure modifications. we will provide WAN/LAN connectivity, cabling, and installation. Scope includes provisioning laptops, desktops, barcode scanners, label printers, RF scanners, and network components (access switches, access points, structured cabling). Software licenses are also included. Estimated timeline: 2–3 months to enable efficient inbound and outbound processes.
+
+Scope of Work
+
+Laptop Computer: 8
+Monitor: 8
+Docking Station: 8
+Keyboard & Mouse: 8
+Headset: 8
+Desktop Computer (Packing Station): 29
+Monitor (Packing Station): 29
+Wired Barcode Scanner (Packing Station): 29
+Industrial Label Printer (Packing Station): 29
+Standard Radio Frequency Scanner: 20
+Standard Quad Battery Charger: 5
+UPS w/warranty (1400VA Rack mountable): 2
+Laptop Computer (Office): 7
+Monitor (Office): 7
+Docking Station (Office): 7
+Keyboard/Mouse (Office): 7
+Headset for Computer: 7
+Laser Printer – MFP All in One (Medium Size): 2
+Cellphone: 15
+SOTI License: 20
+Bartender Automation License: 29Laptop Computer: 8
+Monitor: 8
+Docking Station: 8
+Keyboard & Mouse: 8
+Headset: 8
+Desktop Computer (Packing Station): 29
+Monitor (Packing Station): 29
+Wired Barcode Scanner (Packing Station): 29
+Industrial Label Printer (Packing Station): 29
+Standard Radio Frequency Scanner: 20
+Standard Quad Battery Charger: 5
+UPS w/warranty (1400VA Rack mountable): 2
+Laptop Computer (Office): 7
+Monitor (Office): 7
+Docking Station (Office): 7
+Keyboard/Mouse (Office): 7
+Headset for Computer: 7
+Laser Printer – MFP All in One (Medium Size): 2
+Cellphone: 15
+SOTI License: 20
+Bartender Automation License: 29
