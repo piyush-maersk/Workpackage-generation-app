@@ -83,8 +83,10 @@ class InputParser:
             if suffix in (".xlsx", ".xls"):
                 return self._parse_excel(file_path)
             return self._parse_csv(file_path)
-        except Exception as exc:  # noqa: BLE001
+        except (FileNotFoundError, PermissionError, ValueError) as exc:
             return {"devices": [], "error": str(exc)}
+        except Exception as exc:  # noqa: BLE001 – catch-all for unexpected pandas/openpyxl errors
+            return {"devices": [], "error": f"Unexpected error parsing file: {exc}"}
 
     def _parse_excel(self, file_path: str) -> dict[str, Any]:
         """Try each sheet; return devices from the first sheet that yields results."""

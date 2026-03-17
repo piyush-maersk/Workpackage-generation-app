@@ -9,6 +9,7 @@ RAG Engine – uses LangChain + OpenAI + ChromaDB to:
 from __future__ import annotations
 
 import json
+import logging
 import re
 from pathlib import Path
 from typing import Any
@@ -17,6 +18,8 @@ from langchain_community.document_loaders import Docx2txtLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_openai import OpenAIEmbeddings, ChatOpenAI
 from langchain_community.vectorstores import Chroma
+
+logger = logging.getLogger(__name__)
 
 
 class RAGEngine:
@@ -61,7 +64,8 @@ class RAGEngine:
                     d.metadata["source_file"] = fname
                 chunks = splitter.split_documents(raw)
                 docs.extend(chunks)
-            except Exception:  # noqa: BLE001
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("Failed to load template '%s': %s", fname, exc)
                 continue
 
         if docs:
@@ -368,7 +372,8 @@ class RAGEngine:
                 retriever = self._vectorstore.as_retriever(search_kwargs={"k": 5})
                 docs = retriever.invoke(query)
             return "\n\n---\n\n".join(d.page_content for d in docs)
-        except Exception:  # noqa: BLE001
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Vector store retrieval failed for '%s': %s", template_type, exc)
             return ""
 
     # ── LLM utility ───────────────────────────────────────────────────────────
@@ -382,5 +387,9 @@ class RAGEngine:
             text = re.sub(r"^```(?:json)?\s*", "", text)
             text = re.sub(r"\s*```$", "", text)
             return json.loads(text)
-        except Exception:  # noqa: BLE001
+        except json.JSONDecodeError as exc:
+            logger.warning("LLM returned invalid JSON: %s", exc)
+            return default
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("LLM invocation failed: %s", exc)
             return default

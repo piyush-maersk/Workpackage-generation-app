@@ -445,11 +445,14 @@ def _run_generation(
             type="primary",
         )
 
-    except Exception as exc:  # noqa: BLE001
+    except (ValueError, KeyError, FileNotFoundError) as exc:
+        progress.empty()
+        st.error(f"❌  Configuration or file error: {exc}")
+    except Exception as exc:  # noqa: BLE001 – catch-all to keep prototype UI stable
         progress.empty()
         import traceback
 
-        st.error(f"❌  Error: {exc}")
+        st.error(f"❌  Unexpected error: {exc}")
         with st.expander("🐛  Full traceback"):
             st.code(traceback.format_exc())
 
