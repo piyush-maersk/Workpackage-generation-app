@@ -1,14 +1,78 @@
 """
 Template filler – opens a DOCX template and populates it with
 extracted project data, classified device lists, and AI-generated content.
+
+All six workpackage templates (WAN, Perimeter Firewall, OT Automation Machine,
+MDF, IT Hardware, OT Hardware) share a standardised Deliverables section that
+is aligned with the AOT milestone plan (MS1.3 → MS5).  The standard structure
+is defined in STANDARD_DELIVERABLES below and is already embedded in each DOCX
+template; it does not need to be re-injected at fill-time for normal use.
 """
 from __future__ import annotations
 
+import re
 from datetime import datetime
 from typing import Any
 
 from docx import Document
 from docx.shared import Pt
+
+# Default section number used when the deliverables heading carries no numeric prefix.
+# Most templates number their Deliverables section as "4."; MDF/OT Automation use "5.".
+# The actual value is always extracted from the heading text at runtime.
+_DEFAULT_DELIVERABLES_SECTION = "4"
+
+# ---------------------------------------------------------------------------
+# Standard Deliverables – AOT Milestone-Aligned
+# ---------------------------------------------------------------------------
+# Each entry: (sub_heading_template, [bullet_text, …])
+# {sec} is replaced with the document's deliverables section number (4 or 5).
+STANDARD_DELIVERABLES: list[tuple[str, list[str]]] = [
+    (
+        "{sec}.1 MS1.3 – Provision of Design & Procurement",
+        [
+            "Procurement, design and delivery of all equipment as defined in Sections 1–3",
+            "Physical installation of equipment in designated locations",
+            "Installation of accessories and peripherals as required",
+        ],
+    ),
+    (
+        "{sec}.2 MS2 – FAT (Factory Acceptance Testing)",
+        [
+            "Factory acceptance testing and verification of all hardware prior to site delivery",
+            "Pre-staging and configuration of equipment as per technical requirements",
+            "Confirmation of full Bill of Materials receipt and manufacturer warranty coverage",
+        ],
+    ),
+    (
+        "{sec}.3 MS3 – SAT (Site Acceptance Testing & Commissioning)",
+        [
+            "Physical installation and commissioning of all equipment on site",
+            "Connectivity and integration testing (network, power, and application layer)",
+            "Validation that all delivered equipment meets Section 3 requirements",
+            "All equipment must be validated and ready for operational use prior to Go-Live",
+        ],
+    ),
+    (
+        "{sec}.4 MS4 – UAT (User Acceptance Testing)",
+        [
+            "Operations user acceptance testing",
+            "Asset inventory including: Device type, Model, Serial number",
+            "Mapping of devices to: Users, Stations, Rooms or operational areas",
+            "Handover of equipment to site management and operations team",
+            "Provision of support and escalation contacts",
+        ],
+    ),
+    (
+        "{sec}.5 MS5 – Hypercare & Project Closure",
+        [
+            "Hypercare support during initial operational period",
+            "Confirm NOC monitoring and SLA reports (where applicable)",
+            "Validate all documentation required for handover to support is complete",
+            "Final project acceptance sign-off and closure",
+        ],
+    ),
+]
 
 
 class TemplateFiller:
@@ -82,6 +146,9 @@ class TemplateFiller:
         if generated.get("scope_narrative"):
             self._insert_after_heading(doc, "1. SCOPE OF WORK", generated["scope_narrative"])
 
+        # Ensure deliverables section uses the AOT milestone-aligned standard
+        self._apply_standard_deliverables(doc)
+
         # BoM appendix
         all_it = it_devices + classified_devices.get("Software", [])
         self._append_bom(doc, all_it, "IT Hardware – Bill of Materials")
@@ -114,6 +181,9 @@ class TemplateFiller:
 
         if generated.get("scope_narrative"):
             self._insert_after_heading(doc, "SCOPE OF WORK", generated["scope_narrative"])
+
+        # Ensure deliverables section uses the AOT milestone-aligned standard
+        self._apply_standard_deliverables(doc)
 
         ot_devices = classified_devices.get("OT", [])
         self._append_bom(doc, ot_devices, "OT Hardware – Bill of Materials")
@@ -149,6 +219,9 @@ class TemplateFiller:
 
         # Issue date
         self._set_table_cell(doc, 0, 1, 1, datetime.today().strftime("%d/%m/%Y"))
+
+        # Ensure deliverables section uses the AOT milestone-aligned standard
+        self._apply_standard_deliverables(doc)
 
         net_devices = (
             classified_devices.get("Network", []) + classified_devices.get("MDF", [])
@@ -187,7 +260,85 @@ class TemplateFiller:
             self._insert_after_heading(
                 doc, "OT Machine – Scope Overview", generated["scope_narrative"]
             )
+
+        # Ensure deliverables section uses the AOT milestone-aligned standard
+        self._apply_standard_deliverables(doc)
+
         self._append_bom(doc, auto_devices, "Automation Equipment – Bill of Materials")
+
+    # ── Standard Deliverables ──────────────────────────────────────────────────
+
+    def _apply_standard_deliverables(self, doc: Document) -> None:
+        """
+        Replace the Deliverables section in *doc* with the AOT milestone-aligned
+        standard content defined in STANDARD_DELIVERABLES.
+
+        The method locates the existing Deliverables heading (a paragraph whose
+        heading style contains "Deliverable" as the last word, or whose heading
+        text starts with a digit followed by "Deliverable"), removes everything
+        between that heading and the next same-or-higher-level heading, then
+        inserts the standardised sub-headings and bullet points.
+
+        python-docx does not expose a public insert-after API, so paragraph
+        elements are moved via their underlying lxml ``_element`` references.
+        This is the standard approach recommended in the python-docx documentation
+        for in-place structural modifications.
+
+        This is called automatically when filling every template type so that
+        the generated document always carries the canonical deliverables structure,
+        regardless of what the source DOCX contained.
+        """
+        HEADING_STYLES = {"Heading 1", "Heading 2", "Heading 3", "Heading 4"}
+        paragraphs = doc.paragraphs
+
+        # Find the Deliverables section heading: must be a heading-style paragraph
+        # whose normalised text ends with "deliverables" (case-insensitive).
+        del_idx: int | None = None
+        del_para = None
+        for i, p in enumerate(paragraphs):
+            if p.style.name in HEADING_STYLES:
+                normalised = p.text.replace("\t", " ").strip().lower()
+                if normalised.endswith("deliverables") or normalised == "deliverables":
+                    del_idx = i
+                    del_para = p
+                    break
+        if del_idx is None or del_para is None:
+            return  # No deliverables heading found – nothing to standardise
+
+        # Derive the section number (e.g. "4" from "4. Deliverables" or "5\tDeliverables")
+        m = re.match(r"^(\d+)", del_para.text.replace("\t", " ").strip())
+        sec_num = m.group(1) if m else _DEFAULT_DELIVERABLES_SECTION
+
+        del_style = del_para.style.name  # e.g. "Heading 1" or "Heading 2"
+        sub_style = "Heading 2" if del_style == "Heading 1" else "Heading 3"
+
+        # Find the next major section heading at the same or higher level
+        next_idx: int = len(paragraphs)
+        major_styles = {"Heading 1", "Heading 2"} if del_style == "Heading 2" else {"Heading 1"}
+        for i in range(del_idx + 1, len(paragraphs)):
+            p = paragraphs[i]
+            if p.style.name in major_styles and p.text.strip():
+                next_idx = i
+                break
+
+        # Remove all paragraphs between the deliverables heading and next section.
+        # python-docx does not provide a delete-paragraph API; direct lxml element
+        # removal is the accepted pattern for structural document editing.
+        for p in paragraphs[del_idx + 1 : next_idx]:
+            p._element.getparent().remove(p._element)
+
+        # `del_para` was not deleted; use it directly as the insertion anchor.
+        anchor = del_para
+
+        # Insert standardised milestone sub-sections immediately after the heading.
+        for heading_tmpl, bullets in STANDARD_DELIVERABLES:
+            h_para = doc.add_paragraph(heading_tmpl.format(sec=sec_num), style=sub_style)
+            anchor._element.addnext(h_para._element)
+            anchor = h_para
+            for bullet in bullets:
+                b_para = doc.add_paragraph(bullet, style="List Paragraph")
+                anchor._element.addnext(b_para._element)
+                anchor = b_para
 
     # ── Generic fallback ──────────────────────────────────────────────────────
 
